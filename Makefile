@@ -44,7 +44,7 @@ install: publish-local ## Install the plugin binaries to the local machine
 	tanzu plugin install apps --version $(BUILD_VERSION) --local $(TANZU_PLUGIN_PUBLISH_PATH)/${GOHOSTOS}-${GOHOSTARCH}
 
 .PHONY: build-local
-build-local: prepare test ## Build the plugin binaries locally for the host architecture
+build-local: prepare ## Build the plugin binaries locally for the host architecture
 	@echo BUILD_VERSION: $(BUILD_VERSION)
 	tanzu builder cli compile --version $(BUILD_VERSION) --ldflags "$(LD_FLAGS)" --path ./cmd/plugin --target local --artifacts ${ARTIFACTS_DIR}/${GOHOSTOS}/${GOHOSTARCH}/cli
 

@@ -48,6 +48,7 @@ type Client interface {
 	KubeRestConfig() *rest.Config
 	Discovery() discovery.DiscoveryInterface
 	SetLogger(logger logr.Logger)
+	GetClientSet() *kubernetes.Clientset
 	crclient.Client
 }
 
@@ -65,6 +66,10 @@ func (c *client) Discovery() discovery.DiscoveryInterface {
 
 func (c *client) Client() crclient.Client {
 	return c.lazyLoadClientOrDie()
+}
+
+func (c *client) GetClientSet() *kubernetes.Clientset {
+	return c.lazyLoadKubernetesClientsetOrDie()
 }
 
 func (c *client) Get(ctx context.Context, key crclient.ObjectKey, obj crclient.Object) error {

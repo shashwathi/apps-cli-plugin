@@ -21,6 +21,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -42,7 +43,9 @@ func (c *fakeclient) Discovery() discovery.DiscoveryInterface {
 func (c *fakeclient) SetLogger(logger logr.Logger) {
 	panic(fmt.Errorf("not implemented"))
 }
-
+func (c *fakeclient) GetClientSet() *kubernetes.Clientset {
+	panic(fmt.Errorf("not implemented"))
+}
 func NewFakeCliClient(c crclient.Client) cli.Client {
 	return &fakeclient{
 		defaultNamespace: "default",

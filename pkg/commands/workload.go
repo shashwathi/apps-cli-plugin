@@ -357,8 +357,16 @@ func (opts *WorkloadOptions) PublishLocalSource(ctx context.Context, c *cli.Conf
 	if opts.LocalPath == "" {
 		return true, nil
 	}
-
-	taggedImage := strings.Split(workload.Spec.Source.Image, "@sha")[0]
+	var taggedImage string
+	var local bool
+	if workload.Spec.Source != nil {
+		taggedImage = workload.Spec.Source.Image
+	}
+	if taggedImage == "" {
+		taggedImage = fmt.Sprintf("%s.%s.svc.cluster.local/%s-%s:source", source.ServiceName, source.ServNS, workload.Name, workload.Namespace)
+		local = true
+	}
+	taggedImage = strings.Split(taggedImage, "@sha")[0]
 	okToPush := opts.checkToPublishLocalSource(taggedImage, c, workload)
 	if !okToPush {
 		return okToPush, nil
@@ -388,14 +396,24 @@ func (opts *WorkloadOptions) PublishLocalSource(ctx context.Context, c *cli.Conf
 	} else {
 		return false, fmt.Errorf("unsupported file format %q", opts.LocalPath)
 	}
+	if local {
+		localTransport, err := source.LocalRegsitryTransport(ctx, c.GetClientSet(), c.KubeRestConfig())
+		if err != nil {
+			c.Errorf("Failed to get local registry\n")
+			return false, err
+		}
+		ctx = source.StashContainerRemoteTransport(ctx, localTransport)
+	}
 
 	c.Infof("Publishing source in %q to %q...\n", opts.LocalPath, taggedImage)
 
 	currentRegistryOpts := source.RegistryOpts{CACertPaths: opts.CACertPaths, RegistryUsername: opts.RegistryUsername, RegistryPassword: opts.RegistryPassword, RegistryToken: opts.RegistryToken}
-
 	digestedImage, err := source.ImgpkgPush(ctx, contentDir, fileExclusions, &currentRegistryOpts, taggedImage)
 	if err != nil {
 		return okToPush, err
+	}
+	if local {
+		workload.Spec.Source = &cartov1alpha1.Source{}
 	}
 	workload.Spec.Source.Image = digestedImage
 
