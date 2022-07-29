@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/vmware-tanzu/apps-cli-plugin/pkg/apis"
 	cartov1alpha1 "github.com/vmware-tanzu/apps-cli-plugin/pkg/apis/cartographer/v1alpha1"
@@ -87,16 +88,17 @@ type WorkloadOptions struct {
 	Debug       bool
 	LiveUpdate  bool
 
-	FilePath        string
-	GitRepo         string
-	GitCommit       string
-	GitBranch       string
-	GitTag          string
-	SourceImage     string
-	LocalPath       string
-	ExcludePathFile string
-	Image           string
-	SubPath         string
+	FilePath             string
+	GitRepo              string
+	GitCommit            string
+	GitBranch            string
+	GitTag               string
+	SourceImage          string
+	LocalPath            string
+	ExcludePathFile      string
+	Image                string
+	SubPath              string
+	LocalRegistryService string
 
 	BuildEnv    []string
 	Env         []string
@@ -351,7 +353,7 @@ func (opts *WorkloadOptions) ApplyOptionsToWorkload(ctx context.Context, workloa
 }
 
 // PublishLocalSource packages the specified source code in the --local-path flag and creates an image
-// that will be eventually published to the registry specified in the --source-image flag.
+// that will be eventually published to the registry specified in the --source-image flag or local registry.
 // Returns a boolean that indicates if user does actually want to publish the image and an error in case of failure
 func (opts *WorkloadOptions) PublishLocalSource(ctx context.Context, c *cli.Config, currentWorkload, workload *cartov1alpha1.Workload) (bool, error) {
 	if opts.LocalPath == "" {
@@ -359,11 +361,18 @@ func (opts *WorkloadOptions) PublishLocalSource(ctx context.Context, c *cli.Conf
 	}
 	var taggedImage string
 	var local bool
+	var svcNamespacedName *types.NamespacedName
+
 	if workload.Spec.Source != nil {
 		taggedImage = workload.Spec.Source.Image
 	}
 	if taggedImage == "" {
-		taggedImage = fmt.Sprintf("%s.%s.svc.cluster.local/%s-%s:source", source.ServiceName, source.ServNS, workload.Name, workload.Namespace)
+		var err error
+		svcNamespacedName, err = source.GetNamespacedName(opts.LocalRegistryService)
+		if err != nil {
+			return false, nil
+		}
+		taggedImage = fmt.Sprintf("%s.%s.svc.cluster.local/%s/%s:%s", svcNamespacedName.Namespace, svcNamespacedName.Name, workload.Name, workload.Namespace, source.ImageTag)
 		local = true
 	}
 	taggedImage = strings.Split(taggedImage, "@sha")[0]
@@ -397,7 +406,7 @@ func (opts *WorkloadOptions) PublishLocalSource(ctx context.Context, c *cli.Conf
 		return false, fmt.Errorf("unsupported file format %q", opts.LocalPath)
 	}
 	if local {
-		localTransport, err := source.LocalRegsitryTransport(ctx, c.GetClientSet(), c.KubeRestConfig())
+		localTransport, err := source.LocalRegsitryTransport(ctx, c.GetClientSet(), c.KubeRestConfig(), svcNamespacedName)
 		if err != nil {
 			c.Errorf("Failed to get local registry\n")
 			return false, err
@@ -613,6 +622,7 @@ func (opts *WorkloadOptions) DefineFlags(ctx context.Context, c *cli.Config, cmd
 	cmd.Flags().StringVar(&opts.SubPath, cli.StripDash(flags.SubPathFlagName), "", "relative `path` inside the repo or image to treat as application root (to unset, pass empty string \"\")")
 	cmd.Flags().StringVar(&opts.LocalPath, cli.StripDash(flags.LocalPathFlagName), "", "`path` to a directory, .zip, .jar or .war file containing workload source code")
 	cmd.MarkFlagDirname(cli.StripDash(flags.LocalPathFlagName))
+	cmd.Flags().StringVar(&opts.LocalRegistryService, cli.StripDash(flags.LocalRegistryServiceFlagName), "default/source-registry", "`NamespaceName` of the local registry service deployed on the cluster. For example: registry-namespace/registry-name")
 	cmd.Flags().StringVar(&opts.Image, cli.StripDash(flags.ImageFlagName), "", "pre-built `image`, skips the source resolution and build phases of the supply chain")
 	cmd.Flags().StringArrayVar(&opts.Env, cli.StripDash(flags.EnvFlagName), []string{}, "environment variables represented as a `\"key=value\" pair` (\"key-\" to remove, flag can be used multiple times)")
 	cmd.Flags().StringArrayVar(&opts.BuildEnv, cli.StripDash(flags.BuildEnvFlagName), []string{}, "build environment variables represented as a `\"key=value\" pair` (\"key-\" to remove, flag can be used multiple times)")

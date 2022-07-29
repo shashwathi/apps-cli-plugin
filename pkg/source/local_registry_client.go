@@ -18,28 +18,30 @@ package source
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
-const ServiceName = "source-registry"
-const ServNS = "default"
+const ImageTag = "source"
 
 func LocalRegsitryTransport(ctx context.Context, cl *kubernetes.Clientset,
-	kubeconfig *rest.Config) (http.RoundTripper, error) {
+	kubeconfig *rest.Config, svc *types.NamespacedName) (http.RoundTripper, error) {
 
-	_, err := cl.CoreV1().Services(ServNS).Get(ctx, ServiceName, metav1.GetOptions{})
+	_, err := cl.CoreV1().Services(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	r := cl.CoreV1().RESTClient().Get().Namespace(ServNS).Resource("services").SubResource("proxy").Name(net.JoinSchemeNamePort("https", ServiceName, "443"))
+	r := cl.CoreV1().RESTClient().Get().Namespace(svc.Namespace).Resource("services").SubResource("proxy").Name(net.JoinSchemeNamePort("https", svc.Name, "443"))
 
 	gv := corev1.SchemeGroupVersion
 	kubeconfig.GroupVersion = &gv
@@ -55,4 +57,15 @@ func LocalRegsitryTransport(ctx context.Context, cl *kubernetes.Clientset,
 		Client: client.Client,
 		URL:    r.URL(),
 	}, nil
+}
+
+func GetNamespacedName(input string) (*types.NamespacedName, error) {
+	svcNamespacedName := &types.NamespacedName{}
+	namespaceName := strings.Split(input, "/")
+	if len(namespaceName) == 1 {
+		return svcNamespacedName, fmt.Errorf("failed to get namespace and name of service %q. Expected format namespace/name of service", input)
+	}
+	svcNamespacedName.Namespace = namespaceName[0]
+	svcNamespacedName.Name = namespaceName[1]
+	return svcNamespacedName, nil
 }
