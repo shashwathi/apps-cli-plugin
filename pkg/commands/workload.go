@@ -372,7 +372,7 @@ func (opts *WorkloadOptions) PublishLocalSource(ctx context.Context, c *cli.Conf
 		if err != nil {
 			return false, nil
 		}
-		taggedImage = fmt.Sprintf("%s.%s.svc.cluster.local/%s/%s:%s", svcNamespacedName.Namespace, svcNamespacedName.Name, workload.Name, workload.Namespace, source.ImageTag)
+		taggedImage = fmt.Sprintf("%s.%s.svc.cluster.local/%s/%s:%s", svcNamespacedName.Name, svcNamespacedName.Namespace, workload.Namespace, workload.Name, source.ImageTag)
 		local = true
 	}
 	taggedImage = strings.Split(taggedImage, "@sha")[0]
