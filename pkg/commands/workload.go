@@ -366,15 +366,23 @@ func (opts *WorkloadOptions) PublishLocalSource(ctx context.Context, c *cli.Conf
 	if workload.Spec.Source != nil {
 		taggedImage = workload.Spec.Source.Image
 	}
-	if taggedImage == "" {
-		var err error
-		svcNamespacedName, err = source.GetNamespacedName(opts.LocalRegistryService)
-		if err != nil {
-			return false, nil
-		}
-		taggedImage = fmt.Sprintf("%s.%s.svc.cluster.local/%s/%s:%s", svcNamespacedName.Name, svcNamespacedName.Namespace, workload.Namespace, workload.Name, source.ImageTag)
-		local = true
+
+	var err error
+	svcNamespacedName, err = source.GetNamespacedName(opts.LocalRegistryService)
+	if err != nil {
+		return false, nil
 	}
+	localImageRepo := fmt.Sprintf("%s.%s.svc.cluster.local", svcNamespacedName.Name, svcNamespacedName.Namespace)
+
+	if taggedImage == "" {
+		taggedImage = fmt.Sprintf("%s/%s/%s:%s", localImageRepo, workload.Namespace, workload.Name, source.ImageTag)
+		local = true
+	} else {
+		if strings.HasPrefix(taggedImage, localImageRepo) {
+			local = true
+		}
+	}
+
 	taggedImage = strings.Split(taggedImage, "@sha")[0]
 	okToPush := opts.checkToPublishLocalSource(taggedImage, c, workload)
 	if !okToPush {
